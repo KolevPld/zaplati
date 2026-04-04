@@ -329,7 +329,7 @@ tr.m2-row td { background: rgba(77,159,255,.04); }
 <script>if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
 
 const firebaseConfig = {
@@ -346,7 +346,7 @@ const db  = getFirestore(app);
 const auth = getAuth(app);
 
 // Експортирай към window за достъп от останалия код
-window._fb = { db, auth, doc, getDoc, setDoc, collection, getDocs, signInWithEmailAndPassword, signOut, onAuthStateChanged };
+window._fb = { db, auth, doc, getDoc, setDoc, updateDoc, collection, getDocs, signInWithEmailAndPassword, signOut, onAuthStateChanged };
 
 onAuthStateChanged(auth, user => {
   if (user) {
@@ -385,9 +385,7 @@ const DEFAULT_EMPLOYEES = [
   { id:14, name:'Милен Бозов',             store:'М1', rate:5.11, active:true },
   { id:15, name:'Радослава Славова',       store:'М2', rate:5.11, active:true },
   { id:16, name:'Румяна Николова',         store:'М2', rate:5.11, active:true },
-  { id:17, name:'Вени',                    store:'М1', rate:5.11, active:true },
-  { id:18, name:'Ради',                    store:'М1', rate:5.11, active:true },
-  { id:19, name:'Румяна',                  store:'М2', rate:5.11, active:true },
+  { id:18, name:'Радослава Славова',        store:'М1', rate:5.11, active:true },
 ];
 
 // Структура на запис за месец
@@ -922,8 +920,22 @@ window.doLogout = function() {
   if (auth) signOut(auth);
 };
 
+// Премахва дублираните служители и поправя имена — връща true ако е имало промяна
+function applyEmployeeFixes() {
+  let changed = false;
+  // Премахни записите с кратки/дублирани имена
+  ['Вени', 'Румяна'].forEach(shortName => {
+    const idx = employees.findIndex(e => e.name === shortName);
+    if (idx >= 0) { employees.splice(idx, 1); changed = true; }
+  });
+  // Преименувай "Ради" → "Радослава Славова"
+  const radi = employees.find(e => e.name === 'Ради');
+  if (radi) { radi.name = 'Радослава Славова'; changed = true; }
+  return changed;
+}
+
 async function loadFromFirebase() {
-  const { db, doc, getDoc, collection, getDocs } = window._fb || {};
+  const { db, doc, getDoc, updateDoc, collection, getDocs } = window._fb || {};
   if (!db) { loadAll(); init(); return; }
 
   try {
@@ -931,6 +943,11 @@ async function loadFromFirebase() {
     const empDoc = await getDoc(doc(db, 'zaplati', 'employees'));
     if (empDoc.exists()) {
       employees = empDoc.data().list;
+      // Приложи корекции на имена/дублирани и запиши обратно ако има промяна
+      if (applyEmployeeFixes()) {
+        await updateDoc(doc(db, 'zaplati', 'employees'), { list: employees });
+        console.log('Employees fixed & saved to Firebase.');
+      }
     } else {
       employees = JSON.parse(JSON.stringify(DEFAULT_EMPLOYEES));
       await saveToFirebase();
