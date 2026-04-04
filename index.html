@@ -949,9 +949,9 @@ function applyEmployeeFixes() {
   const validNames = new Set(DEFAULT_EMPLOYEES.map(e => e.name));
   let changed = false;
 
-  // Премахни служители чийто id или ime не фигурират в DEFAULT_EMPLOYEES
+  // Премахни служители чийто id не е в DEFAULT_EMPLOYEES (само по id, не по ime)
   const before = employees.length;
-  employees = employees.filter(e => validIds.has(e.id) || validNames.has(e.name));
+  employees = employees.filter(e => validIds.has(e.id));
   if (employees.length !== before) changed = true;
 
   // За всеки служител в DEFAULT_EMPLOYEES — поправи name/store/rate ако се различават по id
@@ -1285,14 +1285,19 @@ function openRpvTextModal() {
   document.getElementById('rpvTextModal').classList.add('open');
 }
 
-// Съпоставяне по фамилия (последна дума) — toLowerCase includes
+// Съпоставяне: приоритет по фамилия (последна дума), fallback по всяка дума > 3 символа
 function matchEmpByRpv(nameFromPdf) {
-  const words = nameFromPdf.trim().toLowerCase().split(/\s+/);
-  const surname = words[words.length - 1];
+  const rpvWords = nameFromPdf.trim().toLowerCase().split(/\s+/);
+  const rpvSurname = rpvWords[rpvWords.length - 1];
+
+  // 1. Приоритет: фамилия (последна дума от РПВ) се съдържа в името на служителя
+  const bySurname = employees.find(e => e.name.toLowerCase().includes(rpvSurname));
+  if (bySurname) return bySurname;
+
+  // 2. Fallback: всяка дума > 3 символа от РПВ се съдържа в името на служителя
   return employees.find(e => {
     const empName = e.name.toLowerCase();
-    const empSurname = empName.split(/\s+/).pop();
-    return empSurname.includes(surname) || surname.includes(empSurname);
+    return rpvWords.some(word => word.length > 3 && empName.includes(word));
   }) || null;
 }
 
