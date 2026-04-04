@@ -493,11 +493,14 @@ function renderVedомост() {
   </div>`).join('');
 }
 
+let _saveTimer = null;
 function updateField(empId, month, field, input) {
   const val = parseFloat(input.value) || 0;
   getRecord(month, empId)[field] = val;
   input.classList.remove('changed');
   renderVedомост();
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => saveAll(), 1000);
 }
 
 // ═══════════════════════════════════════════════
