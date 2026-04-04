@@ -186,10 +186,9 @@ tr.m2-row td { background: rgba(77,159,255,.04); }
     <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
       <input type="file" id="importHoursFile" accept=".xlsx,.xls" style="display:none" onchange="handleImportHours(this)">
       <input type="file" id="importRpvFile" accept=".xlsx,.xls,.pdf" style="display:none" onchange="handleImportRpv(this)">
-      <input type="file" id="importRpvPdfFile" accept=".pdf" style="display:none" onchange="handleImportRpvPdf(this)">
       <button class="btn btn-outline" onclick="document.getElementById('importHoursFile').click()">📂 Импорт часове</button>
       <button class="btn btn-outline" onclick="document.getElementById('importRpvFile').click()">📂 Импорт РПВ</button>
-      <button class="btn btn-outline" onclick="document.getElementById('importRpvPdfFile').click()">📄 Импорт РПВ (PDF)</button>
+      <button class="btn btn-outline" onclick="openRpvTextModal()">📄 Импорт РПВ (PDF)</button>
       <button class="btn btn-amber" onclick="openRpvJsonModal()" style="color:#000">📋 РПВ JSON</button>
       <button class="btn btn-outline" onclick="printPayslips()">🖨️ Печат фишове</button>
       <button class="btn btn-blue" onclick="exportExcel()">📥 Excel</button>
@@ -274,6 +273,28 @@ tr.m2-row td { background: rgba(77,159,255,.04); }
     <div class="modal-btns">
       <button class="btn btn-outline" onclick="closeModal('payslipModal')">Затвори</button>
       <button class="btn btn-green" onclick="window.print()">🖨️ Печат</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: ИМПОРТ РПВ ТЕКСТ ══ -->
+<div class="modal-bg" id="rpvTextModal">
+  <div class="modal" style="max-width:620px">
+    <h3>📄 Импорт РПВ — текст от PDF</h3>
+    <div class="field-row">
+      <label>Копирайте текста от PDF и го поставете тук</label>
+      <textarea id="rpvTextInput" rows="14" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text1);font-family:var(--mono);font-size:.76rem;padding:8px;resize:vertical;outline:none;line-height:1.5" placeholder="Пример:
+1 АНЕЛИЯ НАЙДЕНОВА АДЖОВА Продавач 64 3.18 203.52 0.00 412.51
+2 БОРИСЛАВ ЕМИЛОВ
+ГЕОРГИЕВ Продавач 168 5.11 856.48 150.00 675.24
+3 ИВАН НИКОЛАЕВ Продавач 168 5.11 856.48 0.00 646.56
+
+Последното число NNN.NN на всеки ред се взима като Сума за получаване.
+Имена на два реда се обединяват автоматично."></textarea>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-outline" onclick="closeModal('rpvTextModal')">Откажи</button>
+      <button class="btn btn-green" onclick="doImportRpvText()">Нанеси</button>
     </div>
   </div>
 </div>
@@ -1256,53 +1277,63 @@ window.addEventListener('keydown', e => {
 });
 
 // ═══════════════════════════════════════════════
-// IMPORT РПВ — PDF (парсване по редове)
+// IMPORT РПВ — ТЕКСТ ОТ PDF
 // ═══════════════════════════════════════════════
 
-// Съпоставяне по фамилия (последна дума) — по-надеждно за кирилски PDF
-function matchEmpBySurname(nameFromPdf) {
-  const words = nameFromPdf.trim().split(/\s+/);
-  const surname = words[words.length - 1].toLowerCase();
+function openRpvTextModal() {
+  document.getElementById('rpvTextInput').value = '';
+  document.getElementById('rpvTextModal').classList.add('open');
+}
+
+// Съпоставяне по фамилия (последна дума) — toLowerCase includes
+function matchEmpByRpv(nameFromPdf) {
+  const words = nameFromPdf.trim().toLowerCase().split(/\s+/);
+  const surname = words[words.length - 1];
   return employees.find(e => {
-    const empSurname = e.name.toLowerCase().split(/\s+/).pop();
-    return empSurname === surname;
+    const empName = e.name.toLowerCase();
+    const empSurname = empName.split(/\s+/).pop();
+    return empSurname.includes(surname) || surname.includes(empSurname);
   }) || null;
 }
 
-// Парсва редове от PDF — търси: номер + кирилски имена + числа, последното = Сума за получаване
-function parseRpvTextLines(lines) {
+// Парсва поставен текст:
+// - редове с числа NNN.NN → последното = Сума за получаване
+// - кирилски думи преди числата = имена
+// - имена на два реда → обединява
+function parseRpvPastedText(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+  const numRe = /\b\d+[.,]\d{2}\b/g;
   const results = [];
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
+    let line = lines[i];
 
-    // Ред започващ с поредно число (напр. "1 АНЕЛИЯ СТЕФАНОВА АДЖОВА ...")
-    const rowMatch = line.match(/^\d+\.?\s+([А-ЯЁа-яё].+)/);
-    if (!rowMatch) continue;
-
-    let content = rowMatch[1];
-
-    // Ако на реда няма числа — името е на два реда, следващият ред съдържа фамилия + числа
-    if (!/\d/.test(content) && i + 1 < lines.length) {
-      const next = lines[i + 1].trim();
-      if (/^[А-ЯЁа-яё]/.test(next)) {
-        content += ' ' + next;
+    // Ако на реда няма числа, но има кирилица — може да е първи ред на двуредово ime
+    if (!/\d+[.,]\d{2}/.test(line) && /[А-ЯЁа-яё]/.test(line) && i + 1 < lines.length) {
+      const next = lines[i + 1];
+      if (/\d+[.,]\d{2}/.test(next)) {
+        // Обедини двата реда
+        line = line + ' ' + next;
         i++;
       }
     }
 
-    // Всички числа от вида 123.45 или 123,45
-    const nums = [...content.matchAll(/\b\d+[.,]\d{2}\b/g)].map(m => m[0]);
+    // Намери всички числа NNN.NN
+    const nums = [...line.matchAll(numRe)].map(m => m[0]);
     if (!nums.length) continue;
 
-    // Последното число = Сума за получаване
+    // Последното число = bank
     const bank = parseFloat(nums[nums.length - 1].replace(',', '.'));
     if (isNaN(bank) || bank <= 0) continue;
 
-    // Кирилски думи преди първата цифра = пълно ime
-    const nameMatch = content.match(/^((?:[А-ЯЁа-яё]+(?:-[А-ЯЁа-яё]+)?\s+){1,3}[А-ЯЁа-яё]+(?:-[А-ЯЁа-яё]+)?)/);
+    // Премахни поредния номер в началото (напр. "1 " или "12 ")
+    const withoutIdx = line.replace(/^\d+\.?\s+/, '');
+
+    // Кирилски думи (с главни букви) преди първото число = пълно ime
+    const nameMatch = withoutIdx.match(/^((?:[А-ЯЁа-яё]+(?:-[А-ЯЁа-яё]+)?[\s]+){1,3}[А-ЯЁа-яё]+(?:-[А-ЯЁа-яё]+)?)/);
     if (!nameMatch) continue;
     const name = nameMatch[1].trim();
+    if (name.length < 3) continue;
 
     results.push({ name, bank });
   }
@@ -1310,64 +1341,34 @@ function parseRpvTextLines(lines) {
   return results;
 }
 
-async function handleImportRpvPdf(input) {
-  const file = input.files[0]; input.value = '';
-  if (!file) return;
-  if (!window.pdfjsLib) return alert('PDF.js библиотеката не е заредена.');
+function doImportRpvText() {
+  const text = document.getElementById('rpvTextInput').value.trim();
+  if (!text) return alert('Поставете текст от PDF.');
 
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const parsed = parseRpvPastedText(text);
+  if (!parsed.length) return alert('Не намерих редове с имена и числа.\nПровери формата на текста.');
 
-    // Извлечи текст — групирай по Y координата (редове)
-    let textLines = [];
-    for (let p = 1; p <= pdf.numPages; p++) {
-      const page = await pdf.getPage(p);
-      const tc = await page.getTextContent();
+  const month = currentMonth;
+  const found = [], notFound = [];
 
-      const items = tc.items.filter(it => it.str.trim());
-      items.sort((a, b) => b.transform[5] - a.transform[5] || a.transform[4] - b.transform[4]);
+  parsed.forEach(({ name, bank }) => {
+    const emp = matchEmpByRpv(name);
+    if (!emp) { notFound.push(`${name}  →  ${bank}`); return; }
+    getRecord(month, emp.id).bank = bank;
+    found.push(`${emp.name}  →  ${bank.toFixed(2)} лв.`);
+  });
 
-      const pageLines = [];
-      for (const it of items) {
-        const last = pageLines[pageLines.length - 1];
-        if (!last || Math.abs(it.transform[5] - last.y) > 4) {
-          pageLines.push({ y: it.transform[5], text: it.str.trim() });
-        } else {
-          last.text += ' ' + it.str.trim();
-        }
-      }
-      textLines.push(...pageLines.map(l => l.text));
-    }
+  renderVedомост();
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => saveAll(), 1000);
+  closeModal('rpvTextModal');
 
-    const parsed = parseRpvTextLines(textLines);
-    if (!parsed.length) return alert('Не намерих служители в PDF-а.\nПровери формата на файла.');
-
-    // Нанеси резултатите
-    const month = currentMonth;
-    const found = [], notFound = [];
-
-    parsed.forEach(({ name, bank }) => {
-      const emp = matchEmpBySurname(name);
-      if (!emp) { notFound.push(`${name} → ${bank}`); return; }
-      getRecord(month, emp.id).bank = bank;
-      found.push(`${emp.name} → ${bank.toFixed(2)} лв.`);
-    });
-
-    renderVedомост();
-    clearTimeout(_saveTimer);
-    _saveTimer = setTimeout(() => saveAll(), 1000);
-
-    const summary = [
-      `✅ Намерени (${found.length}):`,
-      ...found,
-      ...(notFound.length ? [`\n❌ Неразпознати (${notFound.length}):`, ...notFound] : []),
-    ].join('\n');
-    alert(summary);
-
-  } catch (err) {
-    alert('Грешка при четене на PDF: ' + err.message);
-  }
+  const summary = [
+    `✅ Намерени (${found.length}):`,
+    ...found,
+    ...(notFound.length ? [`\n❌ Неразпознати (${notFound.length}):`, ...notFound] : []),
+  ].join('\n');
+  alert(summary);
 }
 
 // init() се вика от loadFromFirebase след зареждане
