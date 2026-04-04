@@ -188,6 +188,7 @@ tr.m2-row td { background: rgba(77,159,255,.04); }
       <input type="file" id="importRpvFile" accept=".xlsx,.xls,.pdf" style="display:none" onchange="handleImportRpv(this)">
       <button class="btn btn-outline" onclick="document.getElementById('importHoursFile').click()">📂 Импорт часове</button>
       <button class="btn btn-outline" onclick="document.getElementById('importRpvFile').click()">📂 Импорт РПВ</button>
+      <button class="btn btn-amber" onclick="openRpvJsonModal()" style="color:#000">📋 РПВ JSON</button>
       <button class="btn btn-outline" onclick="printPayslips()">🖨️ Печат фишове</button>
       <button class="btn btn-blue" onclick="exportExcel()">📥 Excel</button>
       <button class="btn btn-green" onclick="saveAll()">💾 Запази</button>
@@ -271,6 +272,21 @@ tr.m2-row td { background: rgba(77,159,255,.04); }
     <div class="modal-btns">
       <button class="btn btn-outline" onclick="closeModal('payslipModal')">Затвори</button>
       <button class="btn btn-green" onclick="window.print()">🖨️ Печат</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: ИМПОРТ РПВ JSON ══ -->
+<div class="modal-bg" id="rpvJsonModal">
+  <div class="modal" style="max-width:560px">
+    <h3>Импорт РПВ — JSON</h3>
+    <div class="field-row">
+      <label>Поставете JSON масив [{name, bank}, ...]</label>
+      <textarea id="rpvJsonInput" rows="12" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text1);font-family:var(--mono);font-size:.78rem;padding:8px;resize:vertical;outline:none"></textarea>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-outline" onclick="closeModal('rpvJsonModal')">Откажи</button>
+      <button class="btn btn-green" onclick="doImportRpvJson()">Нанеси</button>
     </div>
   </div>
 </div>
@@ -961,6 +977,61 @@ window.saveAll = async function() {
     _origSaveAll();
   }
 };
+
+// ═══════════════════════════════════════════════
+// IMPORT RPV JSON
+// ═══════════════════════════════════════════════
+const RPV_MARCH_2026 = [
+  {name:"Анелия Аджова",         bank:412.51},
+  {name:"Борислав Георгиев",      bank:675.24},
+  {name:"Величка Коева",          bank:543.17},
+  {name:"Венцислава Борносузова", bank:651.98},
+  {name:"Георги Семерджиев",      bank:645.53},
+  {name:"Димитър Велев",          bank:626.64},
+  {name:"Иван Николаев",          bank:646.56},
+  {name:"Иванка Борносузова",     bank:561.37},
+  {name:"Камелия Димитрова",      bank:661.73},
+  {name:"Кралина Колева",         bank:481.27},
+  {name:"Маринела Жекова",        bank:265.71},
+  {name:"Мария Спасова",          bank:652.33},
+  {name:"Милен Бозов",            bank:252.09},
+  {name:"Радослава Славова",      bank:652.33},
+  {name:"Румяна Николова",        bank:625.36},
+];
+
+function importRPV(data) {
+  const month = currentMonth;
+  let matched = 0, unmatched = [];
+  data.forEach(({ name, bank }) => {
+    const norm = (name || '').toLowerCase().trim();
+    const emp = employees.find(e => e.name.toLowerCase().includes(norm) || norm.includes(e.name.toLowerCase()));
+    if (!emp) { unmatched.push(name); return; }
+    getRecord(month, emp.id).bank = bank;
+    matched++;
+  });
+  renderVedомост();
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => saveAll(), 1000);
+  let msg = `Нанесено "по банка" за ${matched} служителя.`;
+  if (unmatched.length) msg += `\nНеразпознати:\n${unmatched.join('\n')}`;
+  alert(msg);
+}
+
+function openRpvJsonModal() {
+  document.getElementById('rpvJsonInput').value = JSON.stringify(RPV_MARCH_2026, null, 2);
+  document.getElementById('rpvJsonModal').classList.add('open');
+}
+
+function doImportRpvJson() {
+  try {
+    const data = JSON.parse(document.getElementById('rpvJsonInput').value);
+    if (!Array.isArray(data)) return alert('Очаква се JSON масив.');
+    closeModal('rpvJsonModal');
+    importRPV(data);
+  } catch (e) {
+    alert('Невалиден JSON: ' + e.message);
+  }
+}
 
 // ═══════════════════════════════════════════════
 // IMPORT — helpers
