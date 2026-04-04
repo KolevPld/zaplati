@@ -817,7 +817,8 @@ document.querySelectorAll('.modal-bg').forEach(m => {
 // INIT
 // ═══════════════════════════════════════════════
 function init() {
-  loadAll();
+  // НЕ извикваме loadAll() тук — данните се зареждат от loadFromFirebase() или loadAll() преди init()
+  if (!employees.length) employees = JSON.parse(JSON.stringify(DEFAULT_EMPLOYEES));
   preloadFeb2026();
 
   // Month buttons
@@ -922,6 +923,7 @@ async function loadFromFirebase() {
     init();
   } catch(e) {
     console.error('Firebase load error:', e);
+    showToast('Грешка при зареждане: ' + e.message);
     loadAll();
     init();
   }
@@ -929,14 +931,15 @@ async function loadFromFirebase() {
 
 async function saveToFirebase() {
   const { db, doc, setDoc } = window._fb || {};
-  if (!db) { saveAll(); return; }
+  if (!db) { _origSaveAll(); return; }
   try {
     await setDoc(doc(db, 'zaplati', 'employees'), { list: employees });
     await setDoc(doc(db, 'zaplati', 'monthData'), { data: monthData });
     showToast('Запазено в облака ✓');
   } catch(e) {
     console.error('Firebase save error:', e);
-    showToast('Грешка при запис!');
+    showToast('Грешка при запис! ' + e.message);
+    _origSaveAll();
   }
 }
 
