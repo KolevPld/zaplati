@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Заплати — Акбар Груп</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f1117;
+  --bg2: #161b27;
+  --bg3: #1e2535;
+  --border: #2a3347;
+  --green: #00d68f;
+  --green2: #00a36c;
+  --amber: #f5a623;
+  --red: #ff4d6d;
+  --blue: #4d9fff;
+  --text1: #e8edf5;
+  --text2: #8b9ab8;
+  --text3: #4a5568;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans Condensed', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text1); font-family: var(--sans); min-height: 100vh; }
+
+/* HEADER */
+.header {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: sticky; top: 0; z-index: 100;
+}
+.header-logo { font-size: 1.1rem; font-weight: 700; color: var(--green); letter-spacing: .05em; }
+.header-sub { font-size: .75rem; color: var(--text2); font-family: var(--mono); }
+.header-right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+
+/* TABS */
+.tabs { display: flex; gap: 2px; background: var(--bg); border-bottom: 1px solid var(--border); padding: 0 24px; }
+.tab { padding: 10px 20px; font-size: .8rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; color: var(--text2); letter-spacing: .06em; text-transform: uppercase; transition: all .2s; }
+.tab.active { color: var(--green); border-bottom-color: var(--green); }
+.tab:hover:not(.active) { color: var(--text1); }
+
+/* LAYOUT */
+.page { display: none; padding: 24px; max-width: 1400px; margin: 0 auto; }
+.page.active { display: block; }
+
+/* CARDS */
+.card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+.card-title { font-size: .7rem; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 16px; }
+
+/* MONTH SELECTOR */
+.month-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+.month-btn { padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg3); color: var(--text2); font-family: var(--sans); font-size: .8rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.month-btn.active { background: var(--green); color: #000; border-color: var(--green); }
+.month-btn:hover:not(.active) { border-color: var(--green); color: var(--green); }
+
+/* SELECT / INPUT */
+select, input[type=text], input[type=number] {
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text1); font-family: var(--sans); font-size: .85rem; padding: 7px 10px;
+  outline: none; transition: border .15s;
+}
+select:focus, input:focus { border-color: var(--green); }
+select { cursor: pointer; }
+
+/* BUTTONS */
+.btn { padding: 7px 16px; border-radius: 6px; border: none; font-family: var(--sans); font-size: .8rem; font-weight: 700; cursor: pointer; letter-spacing: .04em; transition: all .15s; }
+.btn-green { background: var(--green); color: #000; }
+.btn-green:hover { background: var(--green2); }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text2); }
+.btn-outline:hover { border-color: var(--green); color: var(--green); }
+.btn-red { background: transparent; border: 1px solid var(--red); color: var(--red); }
+.btn-amber { background: var(--amber); color: #000; }
+.btn-blue { background: var(--blue); color: #000; }
+
+/* MAIN TABLE */
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+th { background: var(--bg3); color: var(--text2); font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 9px 10px; text-align: right; border-bottom: 2px solid var(--border); white-space: nowrap; }
+th:first-child, th:nth-child(2), th:nth-child(3) { text-align: left; }
+td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: right; vertical-align: middle; }
+td:first-child, td:nth-child(2), td:nth-child(3) { text-align: left; }
+tr:hover td { background: rgba(255,255,255,.02); }
+tr.total-row td { background: var(--bg3); font-weight: 700; border-top: 2px solid var(--border); }
+tr.m1-row td { background: rgba(0,214,143,.04); }
+tr.m2-row td { background: rgba(77,159,255,.04); }
+
+.num { font-family: var(--mono); font-size: .8rem; }
+.pos { color: var(--green); }
+.neg { color: var(--red); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: .68rem; font-weight: 700; }
+.badge-m1 { background: rgba(0,214,143,.15); color: var(--green); }
+.badge-m2 { background: rgba(77,159,255,.15); color: var(--blue); }
+.status-ok { color: var(--green); font-size: .75rem; }
+.status-wait { color: var(--amber); font-size: .75rem; }
+
+/* INLINE EDIT */
+.editable { background: transparent; border: none; color: var(--text1); font-family: var(--mono); font-size: .8rem; width: 80px; text-align: right; padding: 3px 4px; border-radius: 4px; }
+.editable:focus { background: var(--bg3); border: 1px solid var(--green); outline: none; }
+.editable.changed { color: var(--amber); }
+
+/* SUMMARY STRIP */
+.summary-strip { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.sum-card { flex: 1; min-width: 130px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; }
+.sum-label { font-size: .65rem; color: var(--text2); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
+.sum-val { font-family: var(--mono); font-size: 1.05rem; font-weight: 600; }
+
+/* EMPLOYEES PAGE */
+.emp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.emp-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+.emp-name { font-size: .95rem; font-weight: 700; margin-bottom: 6px; }
+.emp-meta { font-size: .75rem; color: var(--text2); display: flex; gap: 12px; margin-bottom: 12px; }
+.emp-field { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: .8rem; }
+.emp-field label { color: var(--text2); }
+.emp-field input { width: 120px; }
+
+/* PAYSLIP */
+.payslip { background: white; color: #111; padding: 32px; border-radius: 8px; max-width: 600px; font-family: Arial, sans-serif; font-size: 12px; }
+.payslip h2 { font-size: 16px; margin-bottom: 4px; }
+.payslip .ps-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee; }
+.payslip .ps-total { font-weight: bold; font-size: 13px; }
+.payslip .ps-section { font-weight: bold; background: #f5f5f5; padding: 4px 0; margin: 8px 0 2px; }
+
+/* MODAL */
+.modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 200; align-items: center; justify-content: center; }
+.modal-bg.open { display: flex; }
+.modal { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 28px; min-width: 340px; max-width: 500px; width: 100%; }
+.modal h3 { margin-bottom: 20px; font-size: 1rem; }
+.field-row { margin-bottom: 14px; }
+.field-row label { display: block; font-size: .72rem; color: var(--text2); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px; }
+.field-row input, .field-row select { width: 100%; }
+.modal-btns { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+
+@media print {
+  body * { visibility: hidden; }
+  .payslip, .payslip * { visibility: visible; }
+  .payslip { position: fixed; inset: 0; margin: 0; border-radius: 0; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-logo">⚡ АКБАР ГРУП — ЗАПЛАТИ</div>
+    <div class="header-sub">ЕООД · ЕИК: 203271083</div>
+  </div>
+  <div class="header-right">
+    <select id="yearSel" onchange="init()">
+      <option>2026</option><option>2025</option>
+    </select>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('vedомост')">📋 Ведомост</div>
+  <div class="tab" onclick="showTab('служители')">👥 Служители</div>
+  <div class="tab" onclick="showTab('обобщение')">📊 Обобщение</div>
+</div>
+
+<!-- ══ ВЕДОМОСТ ══ -->
+<div class="page active" id="tab-vedомост">
+  <div class="month-bar">
+    <span style="font-size:.72rem;color:var(--text2);text-transform:uppercase;letter-spacing:.08em">Месец:</span>
+    <div id="monthBtns"></div>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <button class="btn btn-outline" onclick="printPayslips()">🖨️ Печат фишове</button>
+      <button class="btn btn-blue" onclick="exportExcel()">📥 Excel</button>
+      <button class="btn btn-green" onclick="saveAll()">💾 Запази</button>
+    </div>
+  </div>
+
+  <div class="summary-strip" id="summaryStrip"></div>
+
+  <div class="card">
+    <div class="tbl-wrap">
+      <table id="mainTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th style="min-width:160px">Име</th>
+            <th>Маг.</th>
+            <th>Часове</th>
+            <th>Сума</th>
+            <th>Пр.ч.</th>
+            <th>Допл.</th>
+            <th>Бонус</th>
+            <th>Л.Бонус</th>
+            <th style="background:rgba(0,214,143,.08)">БРУТНО</th>
+            <th>Аванс</th>
+            <th title="Сума за получаване от счетоводство = превод по банка">Сума счет.<br><small style="color:var(--text3);font-size:.6rem">→ по банка</small></th>
+            <th>Кеш</th>
+            <th style="background:rgba(77,159,255,.08)">ОБЩО</th>
+            <th>Статус</th>
+            <th>Фиш</th>
+          </tr>
+        </thead>
+        <tbody id="mainTbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ СЛУЖИТЕЛИ ══ -->
+<div class="page" id="tab-служители">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <div style="font-size:.72rem;color:var(--text2);text-transform:uppercase;letter-spacing:.08em">
+      Управление на служители
+    </div>
+    <button class="btn btn-green" onclick="openAddEmp()">+ Добави служител</button>
+  </div>
+  <div class="emp-grid" id="empGrid"></div>
+</div>
+
+<!-- ══ ОБОБЩЕНИЕ ══ -->
+<div class="page" id="tab-обобщение">
+  <div class="card">
+    <div class="card-title">Годишно обобщение</div>
+    <div class="tbl-wrap">
+      <table id="summTable">
+        <thead>
+          <tr>
+            <th style="text-align:left">Служител</th>
+            <th>Маг.</th>
+            <th>Яну</th><th>Фев</th><th>Мар</th><th>Апр</th>
+            <th>Май</th><th>Юни</th><th>Юли</th><th>Авг</th>
+            <th>Сеп</th><th>Окт</th><th>Ное</th><th>Дек</th>
+            <th style="background:rgba(0,214,143,.08)">Годишно</th>
+          </tr>
+        </thead>
+        <tbody id="summTbody"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:12px;font-size:.72rem;color:var(--text3);line-height:1.6">
+      💡 <strong style="color:var(--text2)">Логика:</strong>
+      Брутно = Часове × Ставка + Доплащания + Бонуси &nbsp;|&nbsp;
+      <span style="color:var(--amber)">Сума счет.</span> = сума за получаване от РПВ (превод по банка от счетоводство) &nbsp;|&nbsp;
+      <span style="color:var(--green)">Кеш</span> = Брутно − Банка − Аванс
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: ФИШ ══ -->
+<div class="modal-bg" id="payslipModal">
+  <div class="modal" style="max-width:620px">
+    <div id="payslipContent"></div>
+    <div class="modal-btns">
+      <button class="btn btn-outline" onclick="closeModal('payslipModal')">Затвори</button>
+      <button class="btn btn-green" onclick="window.print()">🖨️ Печат</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: СЛУЖИТЕЛ ══ -->
+<div class="modal-bg" id="empModal">
+  <div class="modal">
+    <h3 id="empModalTitle">Нов служител</h3>
+    <div class="field-row">
+      <label>Пълно ime</label>
+      <input type="text" id="empName" placeholder="Иван Иванов">
+    </div>
+    <div class="field-row">
+      <label>Магазин</label>
+      <select id="empStore">
+        <option value="М1">М1</option>
+        <option value="М2">М2</option>
+      </select>
+    </div>
+    <div class="field-row">
+      <label>Ставка (€/час)</label>
+      <input type="number" id="empRate" step="0.01" value="5.11">
+    </div>
+    <div class="field-row">
+      <label>Активен</label>
+      <select id="empActive">
+        <option value="1">Да</option>
+        <option value="0">Не</option>
+      </select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-outline" onclick="closeModal('empModal')">Откажи</button>
+      <button class="btn btn-green" onclick="saveEmp()">Запази</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════
+const MONTHS = ['ЯНУАРИ','ФЕВРУАРИ','МАРТ','АПРИЛ','МАЙ','ЮНИ','ЮЛИ','АВГУСТ','СЕПТЕМВРИ','ОКТОМВРИ','НОЕМВРИ','ДЕКЕМВРИ'];
+const MONTHS_SHORT = ['Яну','Фев','Мар','Апр','Май','Юни','Юли','Авг','Сеп','Окт','Ное','Дек'];
+
+// Стандартни данни от Excel файловете
+const DEFAULT_EMPLOYEES = [
+  { id:1,  name:'Анелия Аджова',          store:'М1', rate:3.18, active:true },
+  { id:2,  name:'Борислав Георгиев',       store:'М2', rate:5.11, active:true },
+  { id:3,  name:'Величка Коева',           store:'М1', rate:6.07, active:true },
+  { id:4,  name:'Венцислава Борносузова',  store:'М1', rate:5.11, active:true },
+  { id:5,  name:'Георги Семерджиев',       store:'М2', rate:5.11, active:true },
+  { id:6,  name:'Димитър Велев',           store:'М1', rate:5.11, active:true },
+  { id:7,  name:'Ивайло Джортов',          store:'М1', rate:5.11, active:true },
+  { id:8,  name:'Иван Николаев',           store:'М2', rate:5.11, active:true },
+  { id:9,  name:'Иванка Борносузова',      store:'М2', rate:5.11, active:true },
+  { id:10, name:'Камелия Димитрова',       store:'М2', rate:5.11, active:true },
+  { id:11, name:'Кралина Колева',          store:'М2', rate:6.07, active:true },
+  { id:12, name:'Маринела Жекова',         store:'М2', rate:5.11, active:true },
+  { id:13, name:'Мария Спасова',           store:'М1', rate:5.11, active:true },
+  { id:14, name:'Милен Бозов',             store:'М1', rate:5.11, active:true },
+  { id:15, name:'Радослава Славова',       store:'М2', rate:5.11, active:true },
+  { id:16, name:'Румяна Николова',         store:'М2', rate:5.11, active:true },
+  { id:17, name:'Вени',                    store:'М1', rate:5.11, active:true },
+  { id:18, name:'Ради',                    store:'М1', rate:5.11, active:true },
+  { id:19, name:'Румяна',                  store:'М2', rate:5.11, active:true },
+];
+
+// Структура на запис за месец
+function emptyRecord(empId) {
+  return { empId, hours:0, holidayHours:0, bonus:0, personalBonus:0, advance:0, bank:0 };
+}
+
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+let employees = [];
+let monthData = {}; // { "2026-1": { empId: record } }
+let currentMonth = new Date().getMonth() + 1;
+let editingEmpId = null;
+
+function getKey(month) { return `${document.getElementById('yearSel').value}-${month}`; }
+
+function getRecord(month, empId) {
+  const k = getKey(month);
+  if (!monthData[k]) monthData[k] = {};
+  if (!monthData[k][empId]) monthData[k][empId] = emptyRecord(empId);
+  return monthData[k][empId];
+}
+
+// ═══════════════════════════════════════════════
+// CALCULATIONS
+// ═══════════════════════════════════════════════
+function calcRow(emp, rec) {
+  const salary  = parseFloat((rec.hours * emp.rate).toFixed(2));
+  const holiday  = parseFloat(((rec.holidayHours || 0) * emp.rate * 1.5).toFixed(2));
+  const brutto   = salary + holiday + (rec.bonus||0) + (rec.personalBonus||0);
+  const total    = (rec.bank||0) + (rec.advance||0);
+  const cash     = parseFloat((brutto - (rec.bank||0) - (rec.advance||0)).toFixed(2));
+  const totalPaid = parseFloat(((rec.bank||0) + cash + (rec.advance||0) - (rec.advance||0) + (rec.advance||0)).toFixed(2));
+  const paid     = brutto > 0;
+  return { salary, holiday, brutto, cash, totalPaid: brutto, paid };
+}
+
+// ═══════════════════════════════════════════════
+// RENDER VEDОМОСТ
+// ═══════════════════════════════════════════════
+function renderVedомост() {
+  const tbody = document.getElementById('mainTbody');
+  const month = currentMonth;
+  const activeEmps = employees.filter(e => e.active);
+
+  let totHours=0, totBrutto=0, totBank=0, totCash=0, totAdvance=0, totTotal=0;
+  let m1Brutto=0, m2Brutto=0;
+
+  tbody.innerHTML = activeEmps.map((emp, i) => {
+    const rec = getRecord(month, emp.id);
+    const c = calcRow(emp, rec);
+
+    totHours   += rec.hours||0;
+    totBrutto  += c.brutto;
+    totBank    += rec.bank||0;
+    totCash    += c.cash;
+    totAdvance += rec.advance||0;
+    totTotal   += c.brutto;
+    if (emp.store==='М1') m1Brutto += c.brutto;
+    else m2Brutto += c.brutto;
+
+    const rowCls = emp.store==='М1' ? 'm1-row' : 'm2-row';
+    const statusHtml = c.brutto > 0
+      ? `<span class="status-ok">✓ Платено</span>`
+      : `<span class="status-wait">⏳ Чакащо</span>`;
+
+    return `<tr class="${rowCls}" data-empid="${emp.id}">
+      <td class="num" style="color:var(--text3)">${i+1}</td>
+      <td><strong>${emp.name}</strong></td>
+      <td><span class="badge badge-${emp.store.toLowerCase()}">${emp.store}</span></td>
+      <td><input class="editable" type="number" data-f="hours" value="${rec.hours||''}" placeholder="0" onchange="updateField(${emp.id},${month},'hours',this)" oninput="this.classList.add('changed')"></td>
+      <td class="num">${c.salary > 0 ? c.salary.toFixed(2) : '—'}</td>
+      <td><input class="editable" type="number" data-f="holidayHours" value="${rec.holidayHours||''}" placeholder="0" style="width:60px" onchange="updateField(${emp.id},${month},'holidayHours',this)" oninput="this.classList.add('changed')"></td>
+      <td class="num">${c.holiday > 0 ? c.holiday.toFixed(2) : '—'}</td>
+      <td><input class="editable" type="number" data-f="bonus" value="${rec.bonus||''}" placeholder="0" style="width:65px" onchange="updateField(${emp.id},${month},'bonus',this)" oninput="this.classList.add('changed')"></td>
+      <td><input class="editable" type="number" data-f="personalBonus" value="${rec.personalBonus||''}" placeholder="0" style="width:65px" onchange="updateField(${emp.id},${month},'personalBonus',this)" oninput="this.classList.add('changed')"></td>
+      <td class="num pos" style="font-weight:700">${c.brutto > 0 ? c.brutto.toFixed(2) : '—'}</td>
+      <td><input class="editable" type="number" data-f="advance" value="${rec.advance||''}" placeholder="0" style="width:70px;color:var(--amber)" onchange="updateField(${emp.id},${month},'advance',this)" oninput="this.classList.add('changed')"></td>
+      <td><input class="editable" type="number" data-f="bank" value="${rec.bank||''}" placeholder="0" onchange="updateField(${emp.id},${month},'bank',this)" oninput="this.classList.add('changed')"></td>
+      <td class="num ${c.cash < 0 ? 'neg' : ''}">${c.brutto > 0 ? c.cash.toFixed(2) : '—'}</td>
+      <td class="num" style="font-weight:700;color:var(--blue)">${c.brutto > 0 ? c.brutto.toFixed(2) : '—'}</td>
+      <td>${statusHtml}</td>
+      <td><button class="btn btn-outline" style="padding:3px 10px;font-size:.7rem" onclick="showPayslip(${emp.id},${month})">📄</button></td>
+    </tr>`;
+  }).join('');
+
+  // Total rows
+  tbody.innerHTML += `
+    <tr class="total-row">
+      <td colspan="3">ОБЩО</td>
+      <td class="num">${totHours}</td>
+      <td></td><td></td><td></td><td></td><td></td>
+      <td class="num pos">${totBrutto.toFixed(2)}</td>
+      <td class="num" style="color:var(--amber)">${totAdvance.toFixed(2)}</td>
+      <td class="num">${totBank.toFixed(2)}</td>
+      <td class="num">${totCash.toFixed(2)}</td>
+      <td class="num" style="color:var(--blue)">${totTotal.toFixed(2)}</td>
+      <td colspan="2"></td>
+    </tr>
+    <tr style="background:rgba(0,214,143,.06)">
+      <td colspan="3" style="color:var(--green);font-size:.75rem;font-weight:700">▶ М1</td>
+      <td colspan="6"></td>
+      <td class="num" style="color:var(--green)">${m1Brutto.toFixed(2)}</td>
+      <td colspan="5"></td>
+    </tr>
+    <tr style="background:rgba(77,159,255,.06)">
+      <td colspan="3" style="color:var(--blue);font-size:.75rem;font-weight:700">▶ М2</td>
+      <td colspan="6"></td>
+      <td class="num" style="color:var(--blue)">${m2Brutto.toFixed(2)}</td>
+      <td colspan="5"></td>
+    </tr>`;
+
+  // Summary strip
+  document.getElementById('summaryStrip').innerHTML = [
+    ['БРУТНО', totBrutto.toFixed(2) + ' €', 'var(--green)'],
+    ['ПО БАНКА (счет.)', totBank.toFixed(2) + ' €', 'var(--blue)'],
+    ['КЕШ', totCash.toFixed(2) + ' €', 'var(--text1)'],
+    ['АВАНСИ', totAdvance.toFixed(2) + ' €', 'var(--amber)'],
+    ['М1 БРУТНО', m1Brutto.toFixed(2) + ' €', 'var(--green)'],
+    ['М2 БРУТНО', m2Brutto.toFixed(2) + ' €', 'var(--blue)'],
+  ].map(([l,v,c]) => `<div class="sum-card">
+    <div class="sum-label">${l}</div>
+    <div class="sum-val" style="color:${c}">${v}</div>
+  </div>`).join('');
+}
+
+function updateField(empId, month, field, input) {
+  const val = parseFloat(input.value) || 0;
+  getRecord(month, empId)[field] = val;
+  input.classList.remove('changed');
+  renderVedомост();
+}
+
+// ═══════════════════════════════════════════════
+// PAYSLIP
+// ═══════════════════════════════════════════════
+function showPayslip(empId, month) {
+  const emp = employees.find(e => e.id === empId);
+  const rec = getRecord(month, empId);
+  const c = calcRow(emp, rec);
+  const monthName = MONTHS[month-1];
+  const year = document.getElementById('yearSel').value;
+
+  document.getElementById('payslipContent').innerHTML = `
+    <div class="payslip" id="printSlip">
+      <div style="display:flex;justify-content:space-between;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid #222">
+        <div>
+          <div style="font-size:10px;color:#666;margin-bottom:2px">АКБАР ГРУП ЕООД · ЕИК: 203271083</div>
+          <div style="font-size:18px;font-weight:bold">Фиш за заплата</div>
+          <div style="font-size:11px;color:#444">${monthName} ${year}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:16px;font-weight:bold">${emp.name}</div>
+          <div style="font-size:11px;color:#444">Магазин: ${emp.store} · Ставка: ${emp.rate.toFixed(2)} €/ч</div>
+        </div>
+      </div>
+
+      <div style="font-weight:bold;font-size:11px;padding:6px 0;border-bottom:1px solid #ddd;color:#333;margin-bottom:4px">НАЧИСЛЕНИЯ</div>
+      ${rec.hours > 0 ? `<div class="ps-row"><span>Работни часове (${rec.hours}ч × ${emp.rate.toFixed(2)} €)</span><span>${c.salary.toFixed(2)} €</span></div>` : ''}
+      ${rec.holidayHours > 0 ? `<div class="ps-row"><span>Празнични часове (${rec.holidayHours}ч × ${(emp.rate*1.5).toFixed(2)} €)</span><span>${c.holiday.toFixed(2)} €</span></div>` : ''}
+      ${rec.bonus > 0 ? `<div class="ps-row"><span>Бонус</span><span>${(rec.bonus).toFixed(2)} €</span></div>` : ''}
+      ${rec.personalBonus > 0 ? `<div class="ps-row"><span>Личен бонус</span><span>${(rec.personalBonus).toFixed(2)} €</span></div>` : ''}
+      <div class="ps-row ps-total" style="border-top:2px solid #111;margin-top:6px;padding-top:6px">
+        <span>БРУТНА ЗАПЛАТА</span><span>${c.brutto.toFixed(2)} €</span>
+      </div>
+
+      <div style="font-weight:bold;font-size:11px;padding:10px 0 6px;border-bottom:1px solid #ddd;color:#333;margin-bottom:4px">ИЗПЛАЩАНЕ</div>
+      ${rec.advance > 0 ? `<div class="ps-row"><span>Аванс</span><span>${(rec.advance).toFixed(2)} €</span></div>` : ''}
+      ${rec.bank > 0 ? `<div class="ps-row"><span>По банка (сума от счетоводство)</span><span>${(rec.bank).toFixed(2)} €</span></div>` : ''}
+      ${c.cash !== 0 ? `<div class="ps-row"><span>В брой (кеш)</span><span>${c.cash.toFixed(2)} €</span></div>` : ''}
+      <div class="ps-row ps-total" style="border-top:2px solid #111;margin-top:6px;padding-top:6px;font-size:14px">
+        <span>ОБЩО ИЗПЛАТЕНО</span><span>${c.brutto.toFixed(2)} €</span>
+      </div>
+
+      <div style="margin-top:30px;display:flex;justify-content:space-between;font-size:10px;color:#666">
+        <div>Получил: _______________________</div>
+        <div>Дата: ___/___/______</div>
+        <div>Касиер: _______________________</div>
+      </div>
+    </div>`;
+
+  document.getElementById('payslipModal').classList.add('open');
+}
+
+function printPayslips() {
+  const month = currentMonth;
+  const monthName = MONTHS[month-1];
+  const year = document.getElementById('yearSel').value;
+  const activeEmps = employees.filter(e => e.active && calcRow(e, getRecord(month, e.id)).brutto > 0);
+
+  // фишовете се генерират в slipArr по-долу
+
+  // Групирай по двойки
+  const slipArr = activeEmps.map(emp => {
+    const rec = getRecord(month, emp.id);
+    const c = calcRow(emp, rec);
+    const rows = [];
+    if (rec.hours > 0) rows.push(`<tr><td>Изработени часове: ${rec.hours} ч. × ${emp.rate.toFixed(2)} €</td><td class="amt">${c.salary.toFixed(2)} €</td></tr>`);
+    if (rec.holidayHours > 0) rows.push(`<tr><td>Празнични часове: ${rec.holidayHours} ч. × ${(emp.rate*1.5).toFixed(2)} €</td><td class="amt">${c.holiday.toFixed(2)} €</td></tr>`);
+    if (rec.bonus > 0) rows.push(`<tr><td>Бонус от оборота на магазина</td><td class="amt">${(rec.bonus).toFixed(2)} €</td></tr>`);
+    if (rec.personalBonus > 0) rows.push(`<tr><td>Бонус по преценка на собственици</td><td class="amt">${(rec.personalBonus).toFixed(2)} €</td></tr>`);
+    const payRows = [];
+    if (rec.advance > 0) payRows.push(`<tr><td>Аванс</td><td class="amt">${(rec.advance).toFixed(2)} €</td></tr>`);
+    if (rec.bank > 0) payRows.push(`<tr><td>По банка</td><td class="amt">${(rec.bank).toFixed(2)} €</td></tr>`);
+    if (c.cash > 0) payRows.push(`<tr><td>Кеш</td><td class="amt">${c.cash.toFixed(2)} €</td></tr>`);
+    if (c.cash < 0) payRows.push(`<tr><td style="color:#c00">Надплатено</td><td class="amt" style="color:#c00">${c.cash.toFixed(2)} €</td></tr>`);
+    return `<div class="slip">
+      <table class="slip-header">
+        <tr>
+          <td><span class="slip-title">ФИШ ЗА ЗАПЛАТА</span> | ${monthName} ${year}</td>
+          <td class="slip-store">НОН-СТОП ${emp.store}</td>
+        </tr>
+        <tr>
+          <td class="slip-name">${emp.name}</td>
+          <td class="slip-rate">${emp.rate.toFixed(2)} €/ч</td>
+        </tr>
+      </table>
+      <table class="slip-body">
+        <tr><th colspan="2">НАЧИСЛЕНИЯ</th></tr>
+        ${rows.join('')}
+        <tr class="total-row"><td><strong>ОБЩО БРУТНО</strong></td><td class="amt"><strong>${c.brutto.toFixed(2)} €</strong></td></tr>
+        <tr><th colspan="2">НАЧИН НА ИЗПЛАЩАНЕ</th></tr>
+        ${payRows.join('')}
+        <tr class="total-row"><td><strong>ОБЩО ИЗПЛАТЕНО</strong></td><td class="amt"><strong>${c.brutto.toFixed(2)} €</strong></td></tr>
+      </table>
+      <div class="slip-sign">
+        <span>Подпис: _________________________</span>
+        <span>Дата: ____________</span>
+      </div>
+    </div>`;
+  });
+
+  // По два фиша на ред
+  let pages = '';
+  for (let i = 0; i < slipArr.length; i += 2) {
+    const a = slipArr[i];
+    const b = slipArr[i+1] || '<div class="slip slip-empty"></div>';
+    pages += `<div class="page-row">${a}${b}</div>`;
+  }
+
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Фишове ${monthName} ${year}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 10.5px; color: #111; background: #fff; }
+    .page-row { display: flex; gap: 10px; padding: 8px 10px; page-break-inside: avoid; border-bottom: 1px dashed #bbb; }
+    .page-row:last-child { border-bottom: none; }
+    .slip { flex: 1; border: 1px solid #333; padding: 10px 12px; }
+    .slip-empty { border: none; }
+    .slip-header { width: 100%; border-bottom: 2px solid #111; padding-bottom: 6px; margin-bottom: 8px; }
+    .slip-header td { padding: 1px 0; vertical-align: top; }
+    .slip-title { font-size: 11px; font-weight: bold; }
+    .slip-store { text-align: right; font-weight: bold; font-size: 11px; white-space: nowrap; }
+    .slip-name { font-size: 13px; font-weight: bold; padding-top: 3px; }
+    .slip-rate { text-align: right; color: #555; font-size: 10px; padding-top: 3px; }
+    .slip-body { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+    .slip-body th { text-align: left; background: #f0f0f0; padding: 3px 5px; font-size: 9px; text-transform: uppercase; letter-spacing: .04em; border-top: 1px solid #ccc; }
+    .slip-body td { padding: 3px 5px; border-bottom: 1px solid #eee; }
+    .slip-body .amt { text-align: right; font-weight: 600; white-space: nowrap; }
+    .total-row td { border-top: 1.5px solid #333; background: #fafafa; padding: 4px 5px; font-size: 11px; }
+    .slip-sign { display: flex; justify-content: space-between; margin-top: 10px; font-size: 9px; color: #444; padding-top: 8px; border-top: 1px solid #ddd; }
+    @media print {
+      body { margin: 0; }
+      .page-row { page-break-inside: avoid; }
+    }
+  </style></head><body>
+  ${pages}
+  <script>window.onload = () => window.print();<\/script>
+  </body></html>`);
+  win.document.close();
+}
+
+// ═══════════════════════════════════════════════
+// EMPLOYEES
+// ═══════════════════════════════════════════════
+function renderEmployees() {
+  document.getElementById('empGrid').innerHTML = employees.map(emp => `
+    <div class="emp-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div>
+          <div class="emp-name">${emp.name}</div>
+          <div class="emp-meta">
+            <span class="badge badge-${emp.store.toLowerCase()}">${emp.store}</span>
+            <span>${emp.active ? '✅ Активен' : '⛔ Неактивен'}</span>
+          </div>
+        </div>
+        <button class="btn btn-outline" style="padding:4px 10px;font-size:.7rem" onclick="openEditEmp(${emp.id})">✏️</button>
+      </div>
+      <div class="emp-field">
+        <label>Ставка</label>
+        <span class="num" style="color:var(--green)">${emp.rate.toFixed(4)} €/ч</span>
+      </div>
+    </div>`).join('');
+}
+
+function openAddEmp() {
+  editingEmpId = null;
+  document.getElementById('empModalTitle').textContent = 'Нов служител';
+  document.getElementById('empName').value = '';
+  document.getElementById('empRate').value = '5.11';
+  document.getElementById('empStore').value = 'М1';
+  document.getElementById('empActive').value = '1';
+  document.getElementById('empModal').classList.add('open');
+}
+
+function openEditEmp(id) {
+  const emp = employees.find(e => e.id === id);
+  editingEmpId = id;
+  document.getElementById('empModalTitle').textContent = 'Редактирай служител';
+  document.getElementById('empName').value = emp.name;
+  document.getElementById('empRate').value = emp.rate;
+  document.getElementById('empStore').value = emp.store;
+  document.getElementById('empActive').value = emp.active ? '1' : '0';
+  document.getElementById('empModal').classList.add('open');
+}
+
+function saveEmp() {
+  const name = document.getElementById('empName').value.trim();
+  const rate = parseFloat(document.getElementById('empRate').value);
+  const store = document.getElementById('empStore').value;
+  const active = document.getElementById('empActive').value === '1';
+  if (!name || !rate) return alert('Попълни ime и ставка');
+
+  if (editingEmpId) {
+    const emp = employees.find(e => e.id === editingEmpId);
+    Object.assign(emp, { name, rate, store, active });
+  } else {
+    const newId = Math.max(0, ...employees.map(e => e.id)) + 1;
+    employees.push({ id: newId, name, rate, store, active });
+  }
+  closeModal('empModal');
+  renderEmployees();
+  saveAll();
+}
+
+// ═══════════════════════════════════════════════
+// SUMMARY
+// ═══════════════════════════════════════════════
+function renderSummary() {
+  const tbody = document.getElementById('summTbody');
+  const year = document.getElementById('yearSel').value;
+  const totals = new Array(12).fill(0);
+  let grandTotal = 0;
+
+  tbody.innerHTML = employees.filter(e=>e.active).map(emp => {
+    let empTotal = 0;
+    const cells = MONTHS.map((_, mi) => {
+      const rec = getRecord(mi+1, emp.id);
+      const c = calcRow(emp, rec);
+      totals[mi] += c.brutto;
+      empTotal += c.brutto;
+      grandTotal += c.brutto;
+      return `<td class="num">${c.brutto > 0 ? c.brutto.toFixed(2) : '—'}</td>`;
+    }).join('');
+    return `<tr>
+      <td>${emp.name}</td>
+      <td><span class="badge badge-${emp.store.toLowerCase()}">${emp.store}</span></td>
+      ${cells}
+      <td class="num pos" style="font-weight:700">${empTotal > 0 ? empTotal.toFixed(2) : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  tbody.innerHTML += `<tr class="total-row">
+    <td colspan="2">ОБЩО</td>
+    ${totals.map(t => `<td class="num pos">${t > 0 ? t.toFixed(2) : '—'}</td>`).join('')}
+    <td class="num pos" style="font-size:1rem">${grandTotal.toFixed(2)}</td>
+  </tr>`;
+}
+
+// ═══════════════════════════════════════════════
+// EXCEL EXPORT
+// ═══════════════════════════════════════════════
+function exportExcel() {
+  const month = currentMonth;
+  const monthName = MONTHS[month-1];
+  const year = document.getElementById('yearSel').value;
+  const activeEmps = employees.filter(e => e.active);
+
+  const rows = [
+    [`ВЕДОМОСТ ЗА ЗАПЛАТИ — ${monthName} ${year}`],
+    [],
+    ['#','Ime','Маг','Часове','Сума','Пр.ч.','Допл.','Бонус','Л.Бонус','БРУТНО','Аванс','По банка','Кеш','ОБЩО','Статус'],
+  ];
+
+  activeEmps.forEach((emp, i) => {
+    const rec = getRecord(month, emp.id);
+    const c = calcRow(emp, rec);
+    rows.push([
+      i+1, emp.name, emp.store,
+      rec.hours||0, c.salary, rec.holidayHours||0, c.holiday,
+      rec.bonus||0, rec.personalBonus||0,
+      c.brutto, rec.advance||0, rec.bank||0, c.cash, c.brutto,
+      c.brutto > 0 ? '✓ Платено' : '⏳ Чакащо'
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, monthName);
+  XLSX.writeFile(wb, `Заплати_${monthName}_${year}.xlsx`);
+}
+
+// ═══════════════════════════════════════════════
+// PERSISTENCE
+// ═══════════════════════════════════════════════
+function saveAll() {
+  localStorage.setItem('akbar_employees', JSON.stringify(employees));
+  localStorage.setItem('akbar_monthData', JSON.stringify(monthData));
+  showToast('Запазено ✓');
+}
+
+function loadAll() {
+  const empRaw = localStorage.getItem('akbar_employees');
+  const mdRaw  = localStorage.getItem('akbar_monthData');
+  employees = empRaw ? JSON.parse(empRaw) : JSON.parse(JSON.stringify(DEFAULT_EMPLOYEES));
+  monthData = mdRaw  ? JSON.parse(mdRaw)  : {};
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:var(--green);color:#000;padding:10px 20px;border-radius:8px;font-weight:700;font-size:.85rem;z-index:999;animation:fadeIn .2s';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2000);
+}
+
+// ═══════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'служители') renderEmployees();
+  if (name === 'обобщение') renderSummary();
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+document.querySelectorAll('.modal-bg').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+});
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+function init() {
+  loadAll();
+  preloadFeb2026();
+
+  // Month buttons
+  const bar = document.getElementById('monthBtns');
+  bar.innerHTML = '';
+  MONTHS_SHORT.forEach((m, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'month-btn' + (i+1 === currentMonth ? ' active' : '');
+    btn.textContent = m;
+    btn.onclick = () => {
+      currentMonth = i+1;
+      document.querySelectorAll('.month-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderVedомост();
+    };
+    bar.appendChild(btn);
+  });
+
+  renderVedомост();
+}
+
+
+// ── Предзаредени данни от РПВ Февруари 2026 ──────────────────
+function preloadFeb2026() {
+  const k = '2026-2';
+  if (monthData[k] && Object.keys(monthData[k]).length > 0) return; // вече има данни
+  monthData[k] = {};
+
+  // [empId, hours, holidayHours, bonus, personalBonus, advance, bank(=сума счет.)]
+  // bank = "Сума за получаване" от РПВ на счетоводството
+  const rows = [
+    [1,  64,  0,   0,   0,   0,   219.20],  // Анелия
+    [2,  168, 0,   40,  25,  0,   634.76],  // Борислав
+    [3,  168, 0,   40,  25,  0,   579.46],  // Величка (+ болнични в брутно)
+    [4,  168, 0,   0,   0,   0,   622.35],  // Венцислава
+    [5,  90,  0,   20,  25,  150, 488.67],  // Георги (болнични, аванс 150)
+    [6,  168, 0,   40,  25,  0,   554.96],  // Димитър Велев
+    [8,  168, 0,   40,  25,  0,   646.32],  // Иван
+    [9,  152, 0,   40,  25,  0,   393.47],  // Иванка
+    [10, 168, 0,   40,  25,  0,   612.86],  // Камелия
+    [11, 178, 0,   40,  30,  0,   591.80],  // Кралина
+    [12, 102, 0,   20,  30,  0,   253.63],  // Маринела
+    [13, 192, 0,   40,  25,  0,   646.32],  // Мария
+    [14, 166, 0,   40,  25,  0,   565.49],  // Милен
+    [15, 168, 0,   40,  25,  0,   634.76],  // Радослава
+    [16, 146, 0,   40,  25,  200, 505.33],  // Румяна (аванс 200)
+    [17, 47,  0,   0,   0,   0,   240.17],  // Вени
+    [18, 174, 0,   40,  25,  0,   634.76],  // Ради
+  ];
+
+  rows.forEach(([id, hours, hh, bonus, pb, advance, bank]) => {
+    monthData[k][id] = { empId:id, hours, holidayHours:hh, bonus, personalBonus:pb, advance, bank };
+  });
+}
+
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.modal-bg.open').forEach(m => m.classList.remove('open'));
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveAll(); }
+});
+
+init();
+</script>
+</body>
+</html>
