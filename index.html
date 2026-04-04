@@ -183,7 +183,11 @@ tr.m2-row td { background: rgba(77,159,255,.04); }
   <div class="month-bar">
     <span style="font-size:.72rem;color:var(--text2);text-transform:uppercase;letter-spacing:.08em">Месец:</span>
     <div id="monthBtns"></div>
-    <div style="margin-left:auto;display:flex;gap:8px">
+    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+      <input type="file" id="importHoursFile" accept=".xlsx,.xls" style="display:none" onchange="handleImportHours(this)">
+      <input type="file" id="importRpvFile" accept=".xlsx,.xls,.pdf" style="display:none" onchange="handleImportRpv(this)">
+      <button class="btn btn-outline" onclick="document.getElementById('importHoursFile').click()">📂 Импорт часове</button>
+      <button class="btn btn-outline" onclick="document.getElementById('importRpvFile').click()">📂 Импорт РПВ</button>
       <button class="btn btn-outline" onclick="printPayslips()">🖨️ Печат фишове</button>
       <button class="btn btn-blue" onclick="exportExcel()">📥 Excel</button>
       <button class="btn btn-green" onclick="saveAll()">💾 Запази</button>
@@ -305,6 +309,8 @@ tr.m2-row td { background: rgba(77,159,255,.04); }
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
@@ -955,6 +961,189 @@ window.saveAll = async function() {
     _origSaveAll();
   }
 };
+
+// ═══════════════════════════════════════════════
+// IMPORT — helpers
+// ═══════════════════════════════════════════════
+function matchEmp(nameInFile) {
+  const norm = nameInFile.toLowerCase().trim();
+  if (!norm) return null;
+  // Пълно включване
+  let found = employees.find(e => e.name.toLowerCase().includes(norm) || norm.includes(e.name.toLowerCase()));
+  if (found) return found;
+  // По думи (мин. 3 символа)
+  const words = norm.split(/\s+/).filter(w => w.length >= 3);
+  return employees.find(e => {
+    const en = e.name.toLowerCase();
+    return words.some(w => en.includes(w));
+  }) || null;
+}
+
+function applyImportResults(results, field, label) {
+  const month = currentMonth;
+  let matched = 0, unmatched = [];
+  results.forEach(({ name, value }) => {
+    const emp = matchEmp(name);
+    if (!emp) { unmatched.push(name); return; }
+    getRecord(month, emp.id)[field] = value;
+    matched++;
+  });
+  renderVedомост();
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => saveAll(), 1000);
+  let msg = `${label}: нанесено за ${matched} служителя.`;
+  if (unmatched.length) msg += `\nНеразпознати колони/редове:\n${unmatched.join('\n')}`;
+  alert(msg);
+}
+
+// ═══════════════════════════════════════════════
+// IMPORT ЧАСОВЕ (xlsx)
+// ═══════════════════════════════════════════════
+function handleImportHours(input) {
+  const file = input.files[0]; input.value = '';
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: 0 });
+      if (rows.length < 2) return alert('Файлът е празен или неразпознат формат.');
+
+      const headers = rows[0];
+      // Сумираме часовете по колони (колона 0 = Дата, останалите = служители)
+      const totals = {};
+      for (let r = 1; r < rows.length; r++) {
+        for (let c = 1; c < headers.length; c++) {
+          const v = parseFloat(rows[r][c]) || 0;
+          if (v > 0) totals[c] = (totals[c] || 0) + v;
+        }
+      }
+
+      const results = [];
+      for (let c = 1; c < headers.length; c++) {
+        const name = String(headers[c] || '').trim();
+        if (!name || !totals[c]) continue;
+        results.push({ name, value: Math.round(totals[c] * 100) / 100 });
+      }
+      applyImportResults(results, 'hours', 'Импорт часове');
+    } catch (err) { alert('Грешка: ' + err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ═══════════════════════════════════════════════
+// IMPORT РПВ (xlsx или pdf)
+// ═══════════════════════════════════════════════
+function handleImportRpv(input) {
+  const file = input.files[0]; input.value = '';
+  if (!file) return;
+  if (file.name.toLowerCase().endsWith('.pdf')) importRpvPdf(file);
+  else importRpvXlsx(file);
+}
+
+function importRpvXlsx(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+      // Намери header ред с "Сума за получаване"
+      let headerIdx = -1, bankCol = -1, nameCol = 0;
+      outer: for (let r = 0; r < rows.length; r++) {
+        for (let c = 0; c < rows[r].length; c++) {
+          const cell = String(rows[r][c]).toLowerCase();
+          if (cell.includes('получаване')) { headerIdx = r; bankCol = c; break outer; }
+        }
+      }
+      if (headerIdx < 0) return alert('Не намерих колона "Сума за получаване" в файла.');
+
+      // Намери колоната с имената (търси "служител" / "работник" / "ime" в header ред)
+      const hRow = rows[headerIdx];
+      for (let c = 0; c < hRow.length; c++) {
+        const cell = String(hRow[c]).toLowerCase();
+        if (cell.includes('служител') || cell.includes('работник') || cell.includes('ime') || cell.includes('имe')) {
+          nameCol = c; break;
+        }
+      }
+
+      const results = [];
+      for (let r = headerIdx + 1; r < rows.length; r++) {
+        const name = String(rows[r][nameCol] || '').trim();
+        if (!name) continue;
+        const raw = String(rows[r][bankCol] || '').replace(',', '.').replace(/\s/g, '');
+        const value = parseFloat(raw);
+        if (isNaN(value) || value <= 0) continue;
+        results.push({ name, value });
+      }
+      applyImportResults(results, 'bank', 'Импорт РПВ');
+    } catch (err) { alert('Грешка: ' + err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function importRpvPdf(file) {
+  if (!window.pdfjsLib) return alert('PDF.js библиотеката не е заредена.');
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+    // Събери всички текстови елементи с координати
+    let items = [];
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const tc = await page.getTextContent();
+      tc.items.forEach(it => {
+        if (it.str.trim()) items.push({ x: it.transform[4], y: it.transform[5], text: it.str.trim() });
+      });
+    }
+
+    // Групирай по редове (±4px по Y), сортирай отгоре надолу
+    items.sort((a, b) => b.y - a.y || a.x - b.x);
+    const pdfRows = [];
+    for (const it of items) {
+      const last = pdfRows[pdfRows.length - 1];
+      if (!last || Math.abs(it.y - last[0].y) > 4) pdfRows.push([it]);
+      else { last.push(it); last.sort((a, b) => a.x - b.x); }
+    }
+
+    // Намери header ред с "получаване"
+    let headerIdx = -1, bankX = null;
+    for (let i = 0; i < pdfRows.length; i++) {
+      const lineText = pdfRows[i].map(r => r.text).join(' ');
+      if (/получаване/i.test(lineText)) {
+        headerIdx = i;
+        const it = pdfRows[i].find(r => /получаване/i.test(r.text));
+        bankX = it ? it.x : null;
+        break;
+      }
+    }
+    if (headerIdx < 0 || bankX === null) return alert('Не намерих "Сума за получаване" в PDF-а.');
+
+    const nameX = pdfRows[headerIdx][0].x;
+    const results = [];
+
+    for (let i = headerIdx + 1; i < pdfRows.length; i++) {
+      const row = pdfRows[i];
+      // Имената са в лявата зона преди банковата колона
+      const nameItems = row.filter(r => r.x < bankX - 30 && r.x >= nameX - 5);
+      const name = nameItems.map(r => r.text).join(' ').trim();
+      if (!name || /^(общо|итого|всичко|\d+\s*$)/i.test(name)) continue;
+
+      // Стойност — елементът най-близо до bankX
+      const bankItem = row.reduce((best, r) =>
+        (!best || Math.abs(r.x - bankX) < Math.abs(best.x - bankX)) ? r : best, null);
+      if (!bankItem) continue;
+      const value = parseFloat(bankItem.text.replace(',', '.').replace(/\s/g, ''));
+      if (isNaN(value) || value <= 0) continue;
+
+      results.push({ name, value });
+    }
+    applyImportResults(results, 'bank', 'Импорт РПВ (PDF)');
+  } catch (err) { alert('Грешка при четене на PDF: ' + err.message); }
+}
 
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape') document.querySelectorAll('.modal-bg.open').forEach(m => m.classList.remove('open'));
