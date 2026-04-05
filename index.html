@@ -975,6 +975,14 @@ async function loadFromFirebase() {
     const empDoc = await getDoc(doc(db, 'zaplati', 'employees'));
     if (empDoc.exists()) {
       employees = empDoc.data().list;
+      // Sync fixedSalary from DEFAULT_EMPLOYEES за служители, на които все още не е зададено
+      let fixedChanged = false;
+      DEFAULT_EMPLOYEES.forEach(def => {
+        if (!def.fixedSalary) return;
+        const e = employees.find(x => x.id === def.id);
+        if (e && !e.fixedSalary) { e.fixedSalary = def.fixedSalary; fixedChanged = true; }
+      });
+      if (fixedChanged) await saveToFirebase();
     } else {
       employees = JSON.parse(JSON.stringify(DEFAULT_EMPLOYEES));
       await saveToFirebase();
