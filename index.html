@@ -289,8 +289,11 @@ tr.m2-row td { background: rgba(77,159,255,.04); }
       <input type="number" id="empRate" step="0.01" value="5.11">
     </div>
     <div class="field-row">
-      <label>Фиксирана месечна заплата (€) — остави 0 ако е на часова ставка</label>
-      <input type="number" id="empFixed" step="0.01" value="0">
+      <label>Режим на заплата</label>
+      <select id="empFixedMode">
+        <option value="0">Часова ставка</option>
+        <option value="1">Фиксирана сума (въвежда се месечно)</option>
+      </select>
     </div>
     <div class="field-row">
       <label>Активен</label>
@@ -349,7 +352,7 @@ const MONTHS_SHORT = ['Яну','Фев','Мар','Апр','Май','Юни','Ю�
 
 // Стандартни данни от Excel файловете
 const DEFAULT_EMPLOYEES = [
-  { id:1,  name:'Анелия Аджова',           store:'М1', rate:3.18, active:true, fixedSalary:767.00 },
+  { id:1,  name:'Анелия Аджова',           store:'М1', rate:3.18, active:true, fixedMode:true },
   { id:2,  name:'Борислав Георгиев',        store:'М2', rate:5.11, active:true },
   { id:3,  name:'Величка Коева',            store:'М1', rate:6.07, active:true },
   { id:4,  name:'Венцислава Борносузова',   store:'М1', rate:5.11, active:true },
@@ -370,7 +373,7 @@ const DEFAULT_EMPLOYEES = [
 
 // Структура на запис за месец
 function emptyRecord(empId) {
-  return { empId, hours:0, holidayHours:0, bonus:0, personalBonus:0, advance:0, bank:0 };
+  return { empId, hours:0, holidayHours:0, bonus:0, personalBonus:0, advance:0, bank:0, fixedAmount:0 };
 }
 
 // ═══════════════════════════════════════════════
@@ -394,8 +397,8 @@ function getRecord(month, empId) {
 // CALCULATIONS
 // ═══════════════════════════════════════════════
 function calcRow(emp, rec) {
-  const salary  = emp.fixedSalary > 0
-    ? parseFloat(emp.fixedSalary.toFixed(2))
+  const salary  = emp.fixedMode
+    ? parseFloat((rec.fixedAmount || 0).toFixed(2))
     : parseFloat((rec.hours * emp.rate).toFixed(2));
   const holiday = parseFloat(((rec.holidayHours || 0) * emp.rate * 1.5).toFixed(2));
   const brutto  = parseFloat((salary + holiday + (rec.bonus||0) + (rec.personalBonus||0)).toFixed(2));
@@ -437,7 +440,9 @@ function renderVedомост() {
       <td><strong>${emp.name}</strong></td>
       <td><span class="badge badge-${emp.store.replace('М', 'm').toLowerCase()}">${emp.store}</span></td>
       <td><input class="editable" type="number" data-f="hours" value="${rec.hours||''}" placeholder="0" onchange="updateField(${emp.id},${month},'hours',this)" oninput="this.classList.add('changed')"></td>
-      <td class="num">${c.salary > 0 ? (emp.fixedSalary > 0 ? '📌 ' : '') + c.salary.toFixed(2) : '—'}</td>
+      ${emp.fixedMode
+        ? `<td><input class="editable" type="number" data-f="fixedAmount" value="${rec.fixedAmount||''}" placeholder="0" style="color:var(--amber)" onchange="updateField(${emp.id},${month},'fixedAmount',this)" oninput="this.classList.add('changed')"></td>`
+        : `<td class="num">${c.salary > 0 ? c.salary.toFixed(2) : '—'}</td>`}
       <td><input class="editable" type="number" data-f="holidayHours" value="${rec.holidayHours||''}" placeholder="0" onchange="updateField(${emp.id},${month},'holidayHours',this)" oninput="this.classList.add('changed')"> <span class="num holiday-display" style="font-size:.78rem;color:var(--text2)">${c.holiday > 0 ? c.holiday.toFixed(2) : ''}</span></td>
       <td><input class="editable" type="number" data-f="bonus" value="${rec.bonus||''}" placeholder="0" style="width:65px" onchange="updateField(${emp.id},${month},'bonus',this)" oninput="this.classList.add('changed')"></td>
       <td><input class="editable" type="number" data-f="personalBonus" value="${rec.personalBonus||''}" placeholder="0" style="width:65px" onchange="updateField(${emp.id},${month},'personalBonus',this)" oninput="this.classList.add('changed')"></td>
@@ -503,8 +508,8 @@ function updateField(empId, month, field, input) {
   const row = input.closest('tr');
   if (!row) return;
   const tds = row.querySelectorAll('td');
-  // td[4]=сума, holiday-display спан, td[8]=брутно, td[11]=кеш, td[12]=общо, td[13]=статус
-  if (tds[4])  tds[4].textContent  = c.salary > 0 ? c.salary.toFixed(2) : '—';
+  // td[4]=сума (или fixedAmount input), holiday-display спан, td[8]=брутно, td[11]=кеш, td[12]=общо, td[13]=статус
+  if (tds[4] && !emp.fixedMode) tds[4].textContent = c.salary > 0 ? c.salary.toFixed(2) : '—';
   const hSpan = row.querySelector('.holiday-display'); if (hSpan) hSpan.textContent = c.holiday > 0 ? c.holiday.toFixed(2) : '';
   if (tds[8])  { tds[8].textContent = c.brutto > 0 ? c.brutto.toFixed(2) : '—'; tds[8].className = 'num pos'; }
   if (tds[11]) { tds[11].textContent = c.brutto > 0 ? c.cash.toFixed(2) : '—'; tds[11].className = c.cash < 0 ? 'num neg' : 'num'; }
@@ -695,8 +700,8 @@ function renderEmployees() {
         <button class="btn btn-outline" style="padding:4px 10px;font-size:.7rem" onclick="openEditEmp(${emp.id})">✏️</button>
       </div>
       <div class="emp-field">
-        ${emp.fixedSalary > 0
-          ? `<label>📌 Фиксирана</label><span class="num" style="color:var(--amber)">${emp.fixedSalary.toFixed(2)} €/мес</span>`
+        ${emp.fixedMode
+          ? `<label>📌 Фиксирана сума</label><span class="num" style="color:var(--amber)">въвежда се месечно</span>`
           : `<label>Ставка</label><span class="num" style="color:var(--green)">${emp.rate.toFixed(4)} €/ч</span>`}
       </div>
     </div>`).join('');
@@ -707,7 +712,7 @@ function openAddEmp() {
   document.getElementById('empModalTitle').textContent = 'Нов служител';
   document.getElementById('empName').value = '';
   document.getElementById('empRate').value = '5.11';
-  document.getElementById('empFixed').value = '0';
+  document.getElementById('empFixedMode').value = '0';
   document.getElementById('empStore').value = 'М1';
   document.getElementById('empActive').value = '1';
   document.getElementById('empModal').classList.add('open');
@@ -719,7 +724,7 @@ function openEditEmp(id) {
   document.getElementById('empModalTitle').textContent = 'Редактирай служител';
   document.getElementById('empName').value = emp.name;
   document.getElementById('empRate').value = emp.rate;
-  document.getElementById('empFixed').value = emp.fixedSalary || 0;
+  document.getElementById('empFixedMode').value = emp.fixedMode ? '1' : '0';
   document.getElementById('empStore').value = emp.store;
   document.getElementById('empActive').value = emp.active ? '1' : '0';
   document.getElementById('empModal').classList.add('open');
@@ -728,17 +733,17 @@ function openEditEmp(id) {
 function saveEmp() {
   const name = document.getElementById('empName').value.trim();
   const rate = parseFloat(document.getElementById('empRate').value);
-  const fixedSalary = parseFloat(document.getElementById('empFixed').value) || 0;
+  const fixedMode = document.getElementById('empFixedMode').value === '1';
   const store = document.getElementById('empStore').value;
   const active = document.getElementById('empActive').value === '1';
   if (!name || !rate) return alert('Попълни Иme и ставка');
 
   if (editingEmpId) {
     const emp = employees.find(e => e.id === editingEmpId);
-    Object.assign(emp, { name, rate, fixedSalary, store, active });
+    Object.assign(emp, { name, rate, fixedMode, store, active });
   } else {
     const newId = Math.max(0, ...employees.map(e => e.id)) + 1;
-    employees.push({ id: newId, name, rate, fixedSalary, store, active });
+    employees.push({ id: newId, name, rate, fixedMode, store, active });
   }
   closeModal('empModal');
   renderEmployees();
@@ -975,12 +980,12 @@ async function loadFromFirebase() {
     const empDoc = await getDoc(doc(db, 'zaplati', 'employees'));
     if (empDoc.exists()) {
       employees = empDoc.data().list;
-      // Sync fixedSalary from DEFAULT_EMPLOYEES за служители, на които все още не е зададено
+      // Sync fixedMode from DEFAULT_EMPLOYEES за служители, на които все още не е зададено
       let fixedChanged = false;
       DEFAULT_EMPLOYEES.forEach(def => {
-        if (!def.fixedSalary) return;
+        if (!def.fixedMode) return;
         const e = employees.find(x => x.id === def.id);
-        if (e && !e.fixedSalary) { e.fixedSalary = def.fixedSalary; fixedChanged = true; }
+        if (e && !e.fixedMode) { e.fixedMode = true; fixedChanged = true; }
       });
       if (fixedChanged) await saveToFirebase();
     } else {
