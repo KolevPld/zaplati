@@ -276,7 +276,7 @@ tr.m2-row td { background: rgba(77,159,255,.04); }
   <div class="modal">
     <h3 id="empModalTitle">Нов служител</h3>
     <div class="field-row">
-      <label>Пълно ime</label>
+      <label>Пълно Иme</label>
       <input type="text" id="empName" placeholder="Иван Иванов">
     </div>
     <div class="field-row">
@@ -431,7 +431,7 @@ function renderVedомост() {
     return `<tr class="${rowCls}" data-empid="${emp.id}">
       <td class="num" style="color:var(--text3)">${i+1}</td>
       <td><strong>${emp.name}</strong></td>
-      <td><span class="badge badge-${emp.store.toLowerCase()}">${emp.store}</span></td>
+      <td><span class="badge badge-${emp.store.replace('М', 'm').toLowerCase()}">${emp.store}</span></td>
       <td><input class="editable" type="number" data-f="hours" value="${rec.hours||''}" placeholder="0" onchange="updateField(${emp.id},${month},'hours',this)" oninput="this.classList.add('changed')"></td>
       <td class="num">${c.salary > 0 ? c.salary.toFixed(2) : '—'}</td>
       <td><input class="editable" type="number" data-f="holidayHours" value="${rec.holidayHours||''}" placeholder="0" style="width:60px" onchange="updateField(${emp.id},${month},'holidayHours',this)" oninput="this.classList.add('changed')"></td>
@@ -685,7 +685,7 @@ function renderEmployees() {
         <div>
           <div class="emp-name">${emp.name}</div>
           <div class="emp-meta">
-            <span class="badge badge-${emp.store.toLowerCase()}">${emp.store}</span>
+            <span class="badge badge-${emp.store.replace('М', 'm').toLowerCase()}">${emp.store}</span>
             <span>${emp.active ? '✅ Активен' : '⛔ Неактивен'}</span>
           </div>
         </div>
@@ -724,7 +724,7 @@ function saveEmp() {
   const rate = parseFloat(document.getElementById('empRate').value);
   const store = document.getElementById('empStore').value;
   const active = document.getElementById('empActive').value === '1';
-  if (!name || !rate) return alert('Попълни ime и ставка');
+  if (!name || !rate) return alert('Попълни Иme и ставка');
 
   if (editingEmpId) {
     const emp = employees.find(e => e.id === editingEmpId);
@@ -759,7 +759,7 @@ function renderSummary() {
     }).join('');
     return `<tr>
       <td>${emp.name}</td>
-      <td><span class="badge badge-${emp.store.toLowerCase()}">${emp.store}</span></td>
+      <td><span class="badge badge-${emp.store.replace('М', 'm').toLowerCase()}">${emp.store}</span></td>
       ${cells}
       <td class="num pos" style="font-weight:700">${empTotal > 0 ? empTotal.toFixed(2) : '—'}</td>
     </tr>`;
@@ -784,7 +784,7 @@ function exportExcel() {
   const rows = [
     [`ВЕДОМОСТ ЗА ЗАПЛАТИ — ${monthName} ${year}`],
     [],
-    ['#','Ime','Маг','Часове','Сума','Пр.ч.','Допл.','Бонус','Л.Бонус','БРУТНО','Аванс','По банка','Кеш','ОБЩО','Статус'],
+    ['#','Иme','Маг','Часове','Сума','Пр.ч.','Допл.','Бонус','Л.Бонус','БРУТНО','Аванс','По банка','Кеш','ОБЩО','Статус'],
   ];
 
   activeEmps.forEach((emp, i) => {
@@ -903,6 +903,36 @@ function preloadFeb2026() {
 
   rows.forEach(([id, hours, hh, bonus, pb, advance, bank]) => {
     monthData[k][id] = { empId:id, hours, holidayHours:hh, bonus, personalBonus:pb, advance, bank };
+  });
+}
+
+function preloadMarch2026Hours() {
+  const k = '2026-3';
+  if (!monthData[k]) monthData[k] = {};
+
+  const marchHours = [
+    { name: 'Маринела Жекова',       hours: 98  },
+    { name: 'Иванка Борносузова',     hours: 200 },
+    { name: 'Камелия Димитрова',      hours: 61  },
+    { name: 'Иван Николаев',          hours: 180 },
+    { name: 'Мария Спасова',          hours: 192 },
+    { name: 'Кралина Колева',         hours: 159 },
+    { name: 'Анелия Аджова',          hours: 176 },
+    { name: 'Димитър Велев',          hours: 206 },
+    { name: 'Венцислава Борносузова', hours: 53  },
+    { name: 'Румяна Николова',        hours: 153 },
+  ];
+
+  marchHours.forEach(({ name, hours }) => {
+    const norm = name.toLowerCase();
+    const emp = employees.find(e => e.name.toLowerCase().includes(norm) || norm.includes(e.name.toLowerCase()));
+    if (!emp) return;
+    const rec = monthData[k][emp.id];
+    // Записва само ако часовете още не са въведени
+    if (!rec || !rec.hours) {
+      if (!rec) monthData[k][emp.id] = emptyRecord(emp.id);
+      monthData[k][emp.id].hours = hours;
+    }
   });
 }
 
