@@ -289,6 +289,10 @@ tr.m2-row td { background: rgba(77,159,255,.04); }
       <input type="number" id="empRate" step="0.01" value="5.11">
     </div>
     <div class="field-row">
+      <label>Фиксирана месечна заплата (€) — остави 0 ако е на часова ставка</label>
+      <input type="number" id="empFixed" step="0.01" value="0">
+    </div>
+    <div class="field-row">
       <label>Активен</label>
       <select id="empActive">
         <option value="1">Да</option>
@@ -345,7 +349,7 @@ const MONTHS_SHORT = ['Яну','Фев','Мар','Апр','Май','Юни','Ю�
 
 // Стандартни данни от Excel файловете
 const DEFAULT_EMPLOYEES = [
-  { id:1,  name:'Анелия Аджова',           store:'М1', rate:3.18, active:true },
+  { id:1,  name:'Анелия Аджова',           store:'М1', rate:3.18, active:true, fixedSalary:767.00 },
   { id:2,  name:'Борислав Георгиев',        store:'М2', rate:5.11, active:true },
   { id:3,  name:'Величка Коева',            store:'М1', rate:6.07, active:true },
   { id:4,  name:'Венцислава Борносузова',   store:'М1', rate:5.11, active:true },
@@ -390,7 +394,9 @@ function getRecord(month, empId) {
 // CALCULATIONS
 // ═══════════════════════════════════════════════
 function calcRow(emp, rec) {
-  const salary  = parseFloat((rec.hours * emp.rate).toFixed(2));
+  const salary  = emp.fixedSalary > 0
+    ? parseFloat(emp.fixedSalary.toFixed(2))
+    : parseFloat((rec.hours * emp.rate).toFixed(2));
   const holiday = parseFloat(((rec.holidayHours || 0) * emp.rate * 1.5).toFixed(2));
   const brutto  = parseFloat((salary + holiday + (rec.bonus||0) + (rec.personalBonus||0)).toFixed(2));
   const cash    = parseFloat((brutto - (rec.bank||0) - (rec.advance||0)).toFixed(2));
@@ -431,7 +437,7 @@ function renderVedомост() {
       <td><strong>${emp.name}</strong></td>
       <td><span class="badge badge-${emp.store.replace('М', 'm').toLowerCase()}">${emp.store}</span></td>
       <td><input class="editable" type="number" data-f="hours" value="${rec.hours||''}" placeholder="0" onchange="updateField(${emp.id},${month},'hours',this)" oninput="this.classList.add('changed')"></td>
-      <td class="num">${c.salary > 0 ? c.salary.toFixed(2) : '—'}</td>
+      <td class="num">${c.salary > 0 ? (emp.fixedSalary > 0 ? '📌 ' : '') + c.salary.toFixed(2) : '—'}</td>
       <td><input class="editable" type="number" data-f="holidayHours" value="${rec.holidayHours||''}" placeholder="0" onchange="updateField(${emp.id},${month},'holidayHours',this)" oninput="this.classList.add('changed')"> <span class="num holiday-display" style="font-size:.78rem;color:var(--text2)">${c.holiday > 0 ? c.holiday.toFixed(2) : ''}</span></td>
       <td><input class="editable" type="number" data-f="bonus" value="${rec.bonus||''}" placeholder="0" style="width:65px" onchange="updateField(${emp.id},${month},'bonus',this)" oninput="this.classList.add('changed')"></td>
       <td><input class="editable" type="number" data-f="personalBonus" value="${rec.personalBonus||''}" placeholder="0" style="width:65px" onchange="updateField(${emp.id},${month},'personalBonus',this)" oninput="this.classList.add('changed')"></td>
@@ -689,8 +695,9 @@ function renderEmployees() {
         <button class="btn btn-outline" style="padding:4px 10px;font-size:.7rem" onclick="openEditEmp(${emp.id})">✏️</button>
       </div>
       <div class="emp-field">
-        <label>Ставка</label>
-        <span class="num" style="color:var(--green)">${emp.rate.toFixed(4)} €/ч</span>
+        ${emp.fixedSalary > 0
+          ? `<label>📌 Фиксирана</label><span class="num" style="color:var(--amber)">${emp.fixedSalary.toFixed(2)} €/мес</span>`
+          : `<label>Ставка</label><span class="num" style="color:var(--green)">${emp.rate.toFixed(4)} €/ч</span>`}
       </div>
     </div>`).join('');
 }
@@ -700,6 +707,7 @@ function openAddEmp() {
   document.getElementById('empModalTitle').textContent = 'Нов служител';
   document.getElementById('empName').value = '';
   document.getElementById('empRate').value = '5.11';
+  document.getElementById('empFixed').value = '0';
   document.getElementById('empStore').value = 'М1';
   document.getElementById('empActive').value = '1';
   document.getElementById('empModal').classList.add('open');
@@ -711,6 +719,7 @@ function openEditEmp(id) {
   document.getElementById('empModalTitle').textContent = 'Редактирай служител';
   document.getElementById('empName').value = emp.name;
   document.getElementById('empRate').value = emp.rate;
+  document.getElementById('empFixed').value = emp.fixedSalary || 0;
   document.getElementById('empStore').value = emp.store;
   document.getElementById('empActive').value = emp.active ? '1' : '0';
   document.getElementById('empModal').classList.add('open');
@@ -719,16 +728,17 @@ function openEditEmp(id) {
 function saveEmp() {
   const name = document.getElementById('empName').value.trim();
   const rate = parseFloat(document.getElementById('empRate').value);
+  const fixedSalary = parseFloat(document.getElementById('empFixed').value) || 0;
   const store = document.getElementById('empStore').value;
   const active = document.getElementById('empActive').value === '1';
   if (!name || !rate) return alert('Попълни Иme и ставка');
 
   if (editingEmpId) {
     const emp = employees.find(e => e.id === editingEmpId);
-    Object.assign(emp, { name, rate, store, active });
+    Object.assign(emp, { name, rate, fixedSalary, store, active });
   } else {
     const newId = Math.max(0, ...employees.map(e => e.id)) + 1;
-    employees.push({ id: newId, name, rate, store, active });
+    employees.push({ id: newId, name, rate, fixedSalary, store, active });
   }
   closeModal('empModal');
   renderEmployees();
