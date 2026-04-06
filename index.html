@@ -184,10 +184,14 @@ tr.m2-row td { background: rgba(77,159,255,.04); }
   <div class="month-bar">
     <span style="font-size:.72rem;color:var(--text2);text-transform:uppercase;letter-spacing:.08em">Месец:</span>
     <div id="monthBtns"></div>
-    <div style="margin-left:auto;display:flex;gap:8px">
+    <div id="progressIndicator" style="font-size:.75rem;font-family:var(--mono);color:var(--amber)"></div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+      <span id="lockWarning" style="display:none;font-size:.72rem;color:var(--amber)">🔒 Минал месец — само за преглед</span>
       <button class="btn btn-outline" onclick="printPayslips()">🖨️ Печат фишове</button>
       <button class="btn btn-blue" onclick="exportExcel()">📥 Excel</button>
-      <button class="btn btn-green" onclick="saveAll()">💾 Запази</button>
+      <button id="bonusBtn" class="btn btn-amber" onclick="openBonusModal()">⚡ Бонуси</button>
+      <button id="saveBtn" class="btn btn-green" onclick="saveAll()">💾 Запази</button>
+      <button id="lockBtn" class="btn btn-outline" style="display:none" onclick="toggleLock()">🔓 Редактирай</button>
     </div>
   </div>
 
@@ -196,6 +200,12 @@ tr.m2-row td { background: rgba(77,159,255,.04); }
   <div class="tbl-wrap">
     <table id="mainTable">
       <thead>
+        <tr>
+          <th colspan="3" style="position:static;border-bottom:none;background:transparent"></th>
+          <th colspan="6" style="position:static;background:rgba(0,214,143,.18);color:var(--green);text-align:center;border-bottom:none;font-size:.7rem;letter-spacing:.12em;padding:6px 4px">НАЧИСЛЕНИЯ</th>
+          <th colspan="4" style="position:static;background:rgba(77,159,255,.18);color:var(--blue);text-align:center;border-bottom:none;font-size:.7rem;letter-spacing:.12em;padding:6px 4px">ИЗПЛАЩАНЕ</th>
+          <th colspan="2" style="position:static;border-bottom:none;background:transparent"></th>
+        </tr>
         <tr>
           <th>#</th>
           <th>Име</th>
@@ -305,6 +315,27 @@ tr.m2-row td { background: rgba(77,159,255,.04); }
     <div class="modal-btns">
       <button class="btn btn-outline" onclick="closeModal('empModal')">Откажи</button>
       <button class="btn btn-green" onclick="saveEmp()">Запази</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: БОНУСИ ══ -->
+<div class="modal-bg" id="bonusModal">
+  <div class="modal">
+    <h3>⚡ Бързо попълване на бонуси</h3>
+    <div class="field-row">
+      <label>Бонус оборот (€)</label>
+      <input type="number" id="bulkBonus" value="0" min="0" step="1" style="width:100%">
+    </div>
+    <div class="field-row">
+      <label>Личен бонус (€)</label>
+      <input type="number" id="bulkPersonal" value="0" min="0" step="1" style="width:100%">
+    </div>
+    <div class="modal-btns" style="flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="closeModal('bonusModal')">Откажи</button>
+      <button class="btn btn-outline" style="color:var(--green);border-color:var(--green)" onclick="applyBulkBonus('М1')">Само М1</button>
+      <button class="btn btn-outline" style="color:var(--blue);border-color:var(--blue)" onclick="applyBulkBonus('М2')">Само М2</button>
+      <button class="btn btn-green" onclick="applyBulkBonus('all')">Попълни за всички</button>
     </div>
   </div>
 </div>
@@ -494,10 +525,13 @@ function renderVedомост() {
     <div class="sum-label">${l}</div>
     <div class="sum-val" style="color:${c}">${v}</div>
   </div>`).join('');
+  updateProgress();
+  updateLockState();
 }
 
 function updateField(empId, month, field, input) {
-  const val = parseFloat(input.value) || 0;
+  let val = parseFloat(input.value) || 0;
+  if (val < 0) { val = 0; input.value = 0; }
   getRecord(month, empId)[field] = val;
   input.classList.remove('changed');
   // Обновяване само на изчислените клетки в реда (без пълен ре-рендер)
@@ -517,6 +551,7 @@ function updateField(empId, month, field, input) {
   if (tds[13]) tds[13].innerHTML   = c.brutto > 0 && rec.bank > 0 ? '<span class="status-ok">✓ Платено</span>' : '<span class="status-wait">⏳ Чакащо</span>';
   // Обнови summary strip
   updateSummaryStrip();
+  updateProgress();
   // Автоматично запази след 1.5 сек
   clearTimeout(window._autoSaveTimer);
   window._autoSaveTimer = setTimeout(() => saveAll(), 1500);
@@ -1032,6 +1067,86 @@ window.saveAll = async function() {
     _origSaveAll();
   }
 };
+
+// ═══════════════════════════════════════════════
+// PROGRESS & LOCK
+// ═══════════════════════════════════════════════
+let unlockedMonths = new Set();
+
+function updateProgress() {
+  const month = currentMonth;
+  const activeEmps = employees.filter(e => e.active);
+  const filled = activeEmps.filter(emp => {
+    const rec = getRecord(month, emp.id);
+    return (rec.hours > 0) || (rec.bank > 0);
+  }).length;
+  const total = activeEmps.length;
+  const el = document.getElementById('progressIndicator');
+  if (!el) return;
+  el.textContent = `✓ ${filled} / ${total} въведени`;
+  el.style.color = filled === total ? 'var(--green)' : 'var(--amber)';
+}
+
+function updateLockState() {
+  const yearEl = document.getElementById('yearSel');
+  if (!yearEl) return;
+  const year = parseInt(yearEl.value);
+  const nowYear = new Date().getFullYear();
+  const nowMonth = new Date().getMonth() + 1;
+  const isPast = (year < nowYear) || (year === nowYear && currentMonth < nowMonth);
+  const key = `${year}-${currentMonth}`;
+  const locked = isPast && !unlockedMonths.has(key);
+
+  const saveBtn = document.getElementById('saveBtn');
+  const bonusBtn = document.getElementById('bonusBtn');
+  const lockBtn = document.getElementById('lockBtn');
+  const lockWarning = document.getElementById('lockWarning');
+  if (saveBtn) saveBtn.style.display = locked ? 'none' : '';
+  if (bonusBtn) bonusBtn.style.display = locked ? 'none' : '';
+  if (lockWarning) lockWarning.style.display = locked ? '' : 'none';
+  if (lockBtn) {
+    lockBtn.style.display = isPast ? '' : 'none';
+    lockBtn.textContent = locked ? '🔓 Редактирай' : '🔒 Заключи';
+  }
+
+  document.querySelectorAll('#mainTbody .editable').forEach(inp => {
+    inp.readOnly = locked;
+    inp.style.opacity = locked ? '0.55' : '';
+    inp.style.cursor = locked ? 'not-allowed' : '';
+    inp.style.pointerEvents = locked ? 'none' : '';
+  });
+}
+
+function toggleLock() {
+  const year = parseInt(document.getElementById('yearSel').value);
+  const key = `${year}-${currentMonth}`;
+  if (unlockedMonths.has(key)) unlockedMonths.delete(key);
+  else unlockedMonths.add(key);
+  renderVedомост();
+}
+
+function openBonusModal() {
+  document.getElementById('bulkBonus').value = '0';
+  document.getElementById('bulkPersonal').value = '0';
+  document.getElementById('bonusModal').classList.add('open');
+}
+
+function applyBulkBonus(filter) {
+  const bonus = Math.max(0, parseFloat(document.getElementById('bulkBonus').value) || 0);
+  const personal = Math.max(0, parseFloat(document.getElementById('bulkPersonal').value) || 0);
+  const month = currentMonth;
+  let emps = employees.filter(e => e.active);
+  if (filter === 'М1') emps = emps.filter(e => e.store === 'М1');
+  if (filter === 'М2') emps = emps.filter(e => e.store === 'М2');
+  emps.forEach(emp => {
+    const rec = getRecord(month, emp.id);
+    rec.bonus = bonus;
+    rec.personalBonus = personal;
+  });
+  closeModal('bonusModal');
+  renderVedомост();
+  saveAll();
+}
 
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape') document.querySelectorAll('.modal-bg.open').forEach(m => m.classList.remove('open'));
